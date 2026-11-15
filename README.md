@@ -61,6 +61,7 @@ https://liaoxycn.github.io/webdav-webui/
 - 记住密码是 **localStorage 明文存储**，公共设备请勿勾选；凭据不会上传到任何服务器。
 - 文本/Markdown 预览上限 1 MB，大文件请下载；Markdown 渲染禁用原始 HTML 并做链接过滤。
 - ZIP 打包会递归展开所选文件夹，上限 200 个文件 / 200 MB；浏览器可能拦截「连续下载多个文件」，批量下载时请在地址栏选择「允许」。
+- 仓库不提交 `package-lock.json` 与 `.npmrc`，安装时按 `package.json` 解析最新兼容版本，CI 同样使用 `npm install`。
 
 ## 目录结构
 

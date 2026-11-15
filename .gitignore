@@ -5,6 +5,8 @@ dist-ssr
 .env
 .env.*
 !.env.example
+package-lock.json
+.npmrc
 .DS_Store
 .vite
 *.tsbuildinfo

@@ -32,10 +32,19 @@ export default defineConfig(({ mode }) => {
       sourcemap: false,
       rollupOptions: {
         output: {
-          manualChunks: {
-            react: ['react', 'react-dom', 'react-dom/client'],
-            markdown: ['markdown-it', 'dompurify'],
-            icons: ['lucide-react'],
+          // Vite 8 底层换成 Rolldown，manualChunks 只支持函数形式
+          manualChunks(id: string) {
+            if (!id.includes('node_modules')) return;
+            if (/[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/.test(id)) return 'react';
+            if (/[\\/]node_modules[\\/]lucide-react[\\/]/.test(id)) return 'icons';
+            if (
+              /[\\/]node_modules[\\/](markdown-it|dompurify|entities|linkify-it|mdurl|uc\.micro|punycode)[\\/]/.test(
+                id,
+              )
+            ) {
+              return 'markdown';
+            }
+            return;
           },
         },
       },
