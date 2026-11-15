@@ -1,8 +1,10 @@
 # WebDAV Studio
 
-一个**纯前端**的 WebDAV 文件管理器，基于 Vite + React 18 + TypeScript。没有后端、没有代理、没有第三方服务，浏览器直接与你填写的 WebDAV 服务端通信。
+一个**纯前端**的 WebDAV 文件管理器，基于 Vite 8 + React 19 + TypeScript 7。没有后端、没有代理、没有第三方服务，浏览器直接与你填写的 WebDAV 服务端通信。
 
-![Vite](https://img.shields.io/badge/Vite-6-646CFF) ![React](https://img.shields.io/badge/React-18-61DAFB) ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6)
+![Vite](https://img.shields.io/badge/Vite-8-646CFF) ![React](https://img.shields.io/badge/React-19-61DAFB) ![TypeScript](https://img.shields.io/badge/TypeScript-7-3178C6)
+
+主要依赖：Vite 8（Rolldown 打包）、React 19、TypeScript 7、markdown-it 15 + DOMPurify 3（Markdown 安全渲染）、JSZip 3（批量打包下载）、lucide-react 1（图标）。
 
 ## 功能
 
@@ -14,6 +16,8 @@
 - 凭据保存在浏览器 localStorage：默认只存 URL 与用户名，密码仅在勾选「记住密码」后明文保存
 
 ## 快速开始
+
+需要 Node.js **20.19+ 或 22.12+**（Vite 8 的引擎要求；自动部署工作流使用 Node 24）。
 
 ```bash
 npm install
