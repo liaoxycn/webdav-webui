@@ -43,12 +43,14 @@ jobs:
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
-        with:
-          # 仓库首次部署时 Pages 可能还是关闭状态，尝试自动启用
-          enablement: true
+
+      # npm 10.9.x 在 CI 上偶发 "Exit handler never called!" 导致 npm ci 失败，
+      # 升级到最新 npm 规避；同时关闭审计减少无谓网络请求
+      - name: Upgrade npm
+        run: npm install -g npm@latest
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --no-audit --no-fund
 
       - name: Typecheck
         run: npm run typecheck
