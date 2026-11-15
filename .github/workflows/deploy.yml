@@ -21,10 +21,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
+      # 各 Action 自身的运行时是 Node 24（v7 / v6 / v5 起），
+      # 使用旧主版本会触发 "Node.js 20 is deprecated" 警告
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 24
           # 仓库不提交 package-lock.json，因此无法使用 setup-node 的 npm 缓存
@@ -42,7 +44,7 @@ jobs:
           echo "base=${repo} -> $(tail -1 "$GITHUB_OUTPUT")"
 
       - name: Setup Pages
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v6
 
       # 仓库不提交 lock 文件，用 npm install 按 package.json 解析版本
       - name: Install dependencies
@@ -57,7 +59,7 @@ jobs:
           VITE_BASE: ${{ steps.base.outputs.value }}
 
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: dist
 
@@ -71,4 +73,4 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
