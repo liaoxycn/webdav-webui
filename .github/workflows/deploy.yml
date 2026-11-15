@@ -1,0 +1,76 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+# 只允许一个部署并发执行，避免后一次构建覆盖前一次
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # Pages 项目站点挂在 /<仓库名>/ 下，据此推导 Vite 的 base。
+      # 若仓库是 <用户名>.github.io（用户站点），则挂在站点根，base 为 /。
+      - name: Resolve base path
+        id: base
+        run: |
+          repo="${GITHUB_REPOSITORY#*/}"
+          case "$repo" in
+            *.github.io) echo "value=/" >> "$GITHUB_OUTPUT" ;;
+            *) echo "value=/$repo/" >> "$GITHUB_OUTPUT" ;;
+          esac
+          echo "base=${repo} -> $(tail -1 "$GITHUB_OUTPUT")"
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+        with:
+          # 仓库首次部署时 Pages 可能还是关闭状态，尝试自动启用
+          enablement: true
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+        env:
+          VITE_BASE: ${{ steps.base.outputs.value }}
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    name: Deploy
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

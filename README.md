@@ -41,6 +41,18 @@ npm run build
 
 Nginx 子路径 / 前缀代理配置模板见 [deploy/nginx-subpath.conf.example](deploy/nginx-subpath.conf.example)。如需固定绝对前缀，参考 [.env.example](.env.example) 设置 `VITE_BASE`。本地可用 `npm run serve:prefix` 在 `/webui/` 下验收。
 
+### GitHub Pages
+
+仓库已配置 [.github/workflows/deploy.yml](.github/workflows/deploy.yml)，推送到 `master` 后自动构建并发布，访问地址：
+
+```
+https://<用户名>.github.io/<仓库名>/
+```
+
+首次部署前，在仓库 **Settings → Pages → Build and deployment** 把 Source 选为 **GitHub Actions**（工作流也会尝试自动启用）。Vite 的 `base` 由工作流按仓库名推导，因此 fork 或改名后无需改代码。
+
+> Pages 强制 HTTPS，所以只能连接 **HTTPS** 的 WebDAV 服务端；`http://` 的地址会被浏览器的混合内容策略拦截。
+
 ## 使用须知
 
 - WebDAV 服务端必须正确放行 CORS（含 `Authorization`、`Depth`、`Destination`、`Overwrite` 等头），浏览器无法绕过。
@@ -57,6 +69,7 @@ src/lib/        WebDAV 协议、路径编码、错误分类、安全渲染
 src/components/ 连接页、文件列表、预览编辑、传输面板等
 tools/          本地验收用的 WebDAV 服务与子路径静态服务
 deploy/         Nginx 配置模板
+.github/        GitHub Pages 自动部署工作流
 ```
 
 ---
