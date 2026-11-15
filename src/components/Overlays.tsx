@@ -328,22 +328,23 @@ export function OverwriteDialog({ state }: { state: PendingConflict | null }) {
 
   if (!state) return null;
   const choose = (choice: ConflictChoice) => state.resolve(choice, applyToAll);
+  const action = state.context === 'move' ? '移动' : '上传';
 
   return (
-    <Modal open onClose={() => choose('skip')} closeOnBackdrop={false} ariaLabel="同名文件处理">
+    <Modal open onClose={() => choose('skip')} closeOnBackdrop={false} ariaLabel="同名项目处理">
       <div className="dialog__head">
         <div className="dialog__icon dialog__icon--warning">
           <AlertTriangle size={17} />
         </div>
-        <h2 className="dialog__title">目标文件已存在</h2>
+        <h2 className="dialog__title">目标位置已存在同名项目</h2>
       </div>
       <div className="dialog__body">
         <p className="dialog__text">
-          当前目录下已存在 <strong>{state.name}</strong>，请选择如何处理本次上传。
+          目标目录中已存在 <strong>{state.name}</strong>，请选择如何处理本次{action}。
         </p>
         <div className="notice notice--warning" style={{ margin: '14px 0' }}>
           <AlertTriangle size={15} className="notice__icon" />
-          <span>「覆盖」会用新内容替换原文件，且不可撤销；「自动重命名」会保留两份文件。</span>
+          <span>「覆盖」会替换目标位置已有项目，且不可撤销；「自动重命名」会保留两份。</span>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <button type="button" className="btn btn--block" style={{ justifyContent: 'flex-start' }} onClick={() => choose('rename')}>
@@ -364,7 +365,7 @@ export function OverwriteDialog({ state }: { state: PendingConflict | null }) {
             checked={applyToAll}
             onChange={(event) => setApplyToAll(event.target.checked)}
           />
-          <span className="checkbox__text">对本次上传中的其他同名文件应用相同选择</span>
+          <span className="checkbox__text">对本次{action}中的其他同名项目应用相同选择</span>
         </label>
       </div>
     </Modal>

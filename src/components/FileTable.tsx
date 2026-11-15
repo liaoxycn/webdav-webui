@@ -9,6 +9,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { formatBytes, formatDate, getFileKind, kindLabel } from '../lib/format';
+import type { SelectModifiers } from '../hooks/useSelection';
 import type { DavEntry, ViewMode } from '../types';
 import { FileIcon } from './FileIcon';
 
@@ -23,6 +24,11 @@ export interface FileActions {
 interface Props extends FileActions {
   entries: DavEntry[];
   viewMode: ViewMode;
+  /** 已选中的内部路径集合（跨分页保留，参数为当前页项目） */
+  selected: Set<string>;
+  onSelect: (path: string, mods: SelectModifiers) => void;
+  /** 表头复选框：选中 / 取消当前页全部项目 */
+  onTogglePage: (checked: boolean) => void;
 }
 
 interface MenuPosition {
@@ -48,6 +54,36 @@ export function FileSkeleton({ rows = 8 }: { rows?: number }) {
       ))}
     </div>
   );
+}
+
+function SelectBox({
+  entry,
+  checked,
+  onSelect,
+}: {
+  entry: DavEntry;
+  checked: boolean;
+  onSelect: (path: string, mods: SelectModifiers) => void;
+}) {
+  return (
+    <input
+      type="checkbox"
+      className="row-check"
+      checked={checked}
+      onChange={() => undefined}
+      onClick={(event) => {
+        event.stopPropagation();
+        onSelect(entry.path, event);
+      }}
+      aria-label={`选择 ${entry.name}`}
+      aria-checked={checked}
+    />
+  );
+}
+
+/** 名称 / 卡片被点击时：带修饰键进入多选，否则执行原有的打开行为 */
+function isMultiSelect(event: ReactMouseEvent): boolean {
+  return event.ctrlKey || event.metaKey || event.shiftKey;
 }
 
 function ActionMenu({
@@ -98,8 +134,19 @@ function ActionMenu({
   );
 }
 
-export function FileTable({ entries, viewMode, ...actions }: Props) {
+export function FileTable({
+  entries,
+  viewMode,
+  selected,
+  onSelect,
+  onTogglePage,
+  ...actions
+}: Props) {
   const [menu, setMenu] = useState<MenuPosition | null>(null);
+
+  const selectedOnPage = entries.filter((entry) => selected.has(entry.path)).length;
+  const allOnPage = entries.length > 0 && selectedOnPage === entries.length;
+  const someOnPage = selectedOnPage > 0 && !allOnPage;
 
   useEffect(() => {
     if (!menu) return;
@@ -138,17 +185,32 @@ export function FileTable({ entries, viewMode, ...actions }: Props) {
         <div className="grid-view">
           {entries.map((entry) => {
             const kind = getFileKind(entry);
+            const checked = selected.has(entry.path);
             return (
               <div
                 key={entry.path}
-                className="grid-card"
-                onClick={() => actions.onOpen(entry)}
+                className={`grid-card ${checked ? 'is-selected' : ''}`}
+                onClick={(event) => {
+                  if (isMultiSelect(event)) {
+                    onSelect(entry.path, event);
+                    return;
+                  }
+                  actions.onOpen(entry);
+                }}
                 role="button"
                 tabIndex={0}
+                aria-pressed={checked}
                 onKeyDown={(event) => {
                   if (event.key === 'Enter') actions.onOpen(entry);
+                  if (event.key === ' ') {
+                    event.preventDefault();
+                    onSelect(entry.path, {});
+                  }
                 }}
               >
+                <div className="grid-card__check">
+                  <SelectBox entry={entry} checked={checked} onSelect={onSelect} />
+                </div>
                 <div className="grid-card__thumb">
                   <FileIcon kind={kind} size="lg" />
                 </div>
@@ -185,6 +247,19 @@ export function FileTable({ entries, viewMode, ...actions }: Props) {
         <table className="file-table">
           <thead>
             <tr>
+              <th className="col-check">
+                <input
+                  type="checkbox"
+                  className="row-check"
+                  checked={allOnPage}
+                  ref={(element) => {
+                    if (element) element.indeterminate = someOnPage;
+                  }}
+                  onChange={(event) => onTogglePage(event.target.checked)}
+                  disabled={entries.length === 0}
+                  aria-label="全选当前页"
+                />
+              </th>
               <th>名称</th>
               <th className="col-size">大小</th>
               <th className="col-date">修改时间</th>
@@ -196,8 +271,12 @@ export function FileTable({ entries, viewMode, ...actions }: Props) {
             {entries.map((entry) => {
               const kind = getFileKind(entry);
               const canPreview = ['markdown', 'text', 'code', 'image'].includes(kind);
+              const checked = selected.has(entry.path);
               return (
-                <tr key={entry.path}>
+                <tr key={entry.path} className={checked ? 'is-selected' : ''}>
+                  <td className="col-check">
+                    <SelectBox entry={entry} checked={checked} onSelect={onSelect} />
+                  </td>
                   <td>
                     <div className="file-name-cell">
                       <FileIcon kind={kind} size="sm" />
@@ -205,7 +284,13 @@ export function FileTable({ entries, viewMode, ...actions }: Props) {
                         type="button"
                         className="file-name"
                         title={entry.name}
-                        onClick={() => actions.onOpen(entry)}
+                        onClick={(event) => {
+                          if (isMultiSelect(event)) {
+                            onSelect(entry.path, event);
+                            return;
+                          }
+                          actions.onOpen(entry);
+                        }}
                       >
                         {entry.name}
                       </button>

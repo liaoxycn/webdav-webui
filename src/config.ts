@@ -11,6 +11,15 @@ export const CONFIG = {
   REQUEST_TIMEOUT_MS: 45_000,
   /** 上传并发数（避免一次性发起过多 XHR 拖垮浏览器） */
   UPLOAD_CONCURRENCY: 2,
+  /** 批量操作并发数（DELETE / MOVE / 下载 / 打包读取） */
+  BATCH_CONCURRENCY: 2,
+  /** 批量下载时两次触发浏览器保存之间的间隔，降低被浏览器判定为「自动多文件下载」而拦截的概率 */
+  BATCH_DOWNLOAD_INTERVAL_MS: 350,
+  /** ZIP 打包安全上限：文件数、总字节数、目录递归深度 */
+  ZIP_MAX_FILES: 200,
+  ZIP_MAX_TOTAL_BYTES: 200 * 1024 * 1024,
+  ZIP_MAX_DEPTH: 12,
+  ZIP_COMPRESSION_LEVEL: 6,
   /** PROPFIND 默认深度 */
   PROPFIND_DEPTH: 1,
   /** 存储键 */

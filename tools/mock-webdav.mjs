@@ -316,8 +316,14 @@ const server = http.createServer((req, res) => {
         respond(res, 400, { 'Content-Type': 'text/plain' }, 'Bad Destination');
         return;
       }
+      // Destination 的尾斜杠由客户端按资源类型决定：集合带 /，文件不带。
+      // 这里原样保留，避免把移动后的文件误存成目录。
+      const overwrite = (req.headers.overwrite ?? 'T').toUpperCase() !== 'F';
+      if (!overwrite && store.has(dest.path)) {
+        respond(res, 412, { 'Content-Type': 'text/plain' }, 'Destination already exists');
+        return;
+      }
       const sourceDir = path.endsWith('/') ? path : `${path}/`;
-      const destDir = dest.path.endsWith('/') ? dest.path : `${dest.path}/`;
       const keys = [...store.entries()].filter(
         ([key]) => key === path || key === sourceDir || (isDir && key.startsWith(sourceDir)),
       );
@@ -327,7 +333,7 @@ const server = http.createServer((req, res) => {
       }
       for (const [key, value] of keys) {
         const suffix = key === path || key === sourceDir ? '' : key.slice(sourceDir.length);
-        store.set(`${destDir}${suffix}`, value);
+        store.set(`${dest.path}${suffix}`, value);
         store.delete(key);
       }
       respond(res, 201);

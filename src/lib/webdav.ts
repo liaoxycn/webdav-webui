@@ -575,16 +575,30 @@ export class WebDavClient {
     });
   }
 
-  async delete(path: string, isCollection: boolean): Promise<void> {
-    const response = await this.request('DELETE', path, { isCollection });
+  async delete(path: string, isCollection: boolean, signal?: AbortSignal): Promise<void> {
+    const response = await this.request('DELETE', path, { isCollection, signal });
     this.assertSuccess(response);
   }
 
-  async move(fromPath: string, toPath: string, isCollection: boolean): Promise<void> {
+  /**
+   * MOVE 重命名 / 移动资源。
+   * overwrite 默认 false（Overwrite: F，目标已存在时服务端应返回 412），
+   * 批量移动中用户显式选择「覆盖」时才置为 T。
+   */
+  async move(
+    fromPath: string,
+    toPath: string,
+    isCollection: boolean,
+    options: { signal?: AbortSignal; overwrite?: boolean } = {},
+  ): Promise<void> {
     const destination = buildResourceUrl(this.credentials.rootUrl, toPath, isCollection);
     const response = await this.request('MOVE', fromPath, {
       isCollection,
-      headers: { Destination: destination, Overwrite: 'F' },
+      signal: options.signal,
+      headers: {
+        Destination: destination,
+        Overwrite: options.overwrite ? 'T' : 'F',
+      },
     });
     this.assertSuccess(response);
   }

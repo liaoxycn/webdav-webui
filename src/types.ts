@@ -137,7 +137,41 @@ export type ConflictChoice = 'overwrite' | 'rename' | 'skip';
 
 export interface PendingConflict {
   name: string;
+  /** 触发冲突的操作，用于让对话框文案区分「上传」与「移动」 */
+  context?: 'upload' | 'move';
   resolve: (choice: ConflictChoice, applyToAll: boolean) => void;
+}
+
+/* ------------------------------ 批量处理 ------------------------------ */
+
+export type BatchKind = 'delete' | 'download' | 'move' | 'zip';
+export type BatchItemStatus = 'pending' | 'running' | 'done' | 'error' | 'skipped' | 'canceled';
+
+/** 批量任务中的一项；id 通常为资源的内部路径 */
+export interface BatchItem {
+  id: string;
+  /** 展示名称（ZIP 场景为压缩包内的相对路径） */
+  name: string;
+  status: BatchItemStatus;
+  detail?: string;
+  loaded?: number;
+  total?: number;
+  isCollection?: boolean;
+}
+
+export interface BatchJob {
+  id: string;
+  kind: BatchKind;
+  title: string;
+  items: BatchItem[];
+  finished: boolean;
+  canceled: boolean;
+}
+
+/** 目录选择器返回的目标信息 */
+export interface MoveTarget {
+  path: string;
+  existingNames: string[];
 }
 
 export type ToastTone = 'success' | 'error' | 'info' | 'warning';

@@ -13,6 +13,7 @@ import {
   Home,
   Image as ImageIcon,
   LayoutGrid,
+  Layers,
   List,
   LogOut,
   Moon,
@@ -25,6 +26,8 @@ import {
   X,
 } from 'lucide-react';
 import { CONFIG } from '../config';
+import { useBatchActions } from '../hooks/useBatchActions';
+import { useSelection } from '../hooks/useSelection';
 import { saveBlob } from '../lib/download';
 import { asErrorInfo } from '../lib/errors';
 import { formatBytes, getFileKind, matchesKindFilter } from '../lib/format';
@@ -54,7 +57,10 @@ import type {
   UploadTask,
   ViewMode,
 } from '../types';
+import { BatchBar } from './BatchBar';
+import { BatchPanel } from './BatchPanel';
 import { FileSkeleton, FileTable } from './FileTable';
+import { MoveDialog } from './MoveDialog';
 import {
   ConfirmDialog,
   EmptyState,
@@ -132,6 +138,10 @@ export function Browser({
   const dragDepth = useRef(0);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const toastSeq = useRef(0);
+
+  /* ------------------------------ 批量多选 ------------------------------ */
+  const { selected, select, togglePage, selectAll, clear, keep } = useSelection();
+  const [moveOpen, setMoveOpen] = useState(false);
 
   useEffect(() => {
     pathRef.current = path;
@@ -234,6 +244,38 @@ export function Browser({
   const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
   const currentPage = Math.min(page, totalPages);
   const pageItems = sorted.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const pagePaths = useMemo(() => pageItems.map((entry) => entry.path), [pageItems]);
+
+  /** 选择集基于「全部筛选结果」，因此跨分页仍然保留 */
+  const selectedEntries = useMemo(
+    () => sorted.filter((entry) => selected.has(entry.path)),
+    [sorted, selected],
+  );
+  const selectedFileCount = selectedEntries.filter((entry) => !entry.isCollection).length;
+  const selectedFolderCount = selectedEntries.length - selectedFileCount;
+  const selectedBytes = selectedEntries.reduce((sum, entry) => sum + (entry.size ?? 0), 0);
+
+  // 切换目录后清空选择，避免把上一个目录的路径带进批量操作
+  useEffect(() => {
+    clear();
+  }, [path, clear]);
+
+  // Ctrl/Cmd+A 全选当前筛选结果，Esc 取消选择；输入框与弹窗内不拦截
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target?.closest('input, textarea, select, [contenteditable="true"]')) return;
+      if (document.querySelector('.dialog-backdrop')) return;
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a') {
+        event.preventDefault();
+        selectAll(sorted.map((entry) => entry.path));
+      } else if (event.key === 'Escape' && selected.size > 0) {
+        clear();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [sorted, selected.size, selectAll, clear]);
 
   const folderCount = useMemo(() => entries.filter((item) => item.isCollection).length, [entries]);
   const fileCount = entries.length - folderCount;
@@ -241,6 +283,75 @@ export function Browser({
   const navigate = (target: string) => void loadDirectory(target);
   const goUp = () => navigate(dirName(path));
   const refresh = () => void loadDirectory(path);
+
+  /* ------------------------------ 批量操作 ------------------------------ */
+
+  const askConflict = (name: string, context: 'upload' | 'move' = 'upload'): Promise<ConflictChoice> =>
+    new Promise((resolve) => {
+      setConflict({
+        name,
+        context,
+        resolve: (choice, applyToAll) => {
+          if (applyToAll) applyAllChoice.current = choice;
+          setConflict(null);
+          resolve(choice);
+        },
+      });
+    });
+
+  const batch = useBatchActions({
+    client,
+    currentPath: path,
+    refresh,
+    toast: pushToast,
+    askConflict,
+    clearSelection: clear,
+    keepSelection: keep,
+  });
+
+  const handleBatchDelete = () => {
+    const list = selectedEntries;
+    if (list.length === 0) return;
+    const preview = list.slice(0, 3).map((entry) => `「${entry.name}」`).join('、');
+    setConfirm({
+      title: `批量删除 ${list.length} 项`,
+      description: `将删除 ${preview}${list.length > 3 ? ` 等共 ${list.length} 项` : ''}。${
+        selectedFolderCount > 0
+          ? '其中包含的文件夹会按 WebDAV DELETE 语义连同内部所有内容一并删除。'
+          : '删除后文件内容将无法通过本工具恢复。'
+      }`,
+      confirmLabel: `确认删除 ${list.length} 项`,
+      tone: 'danger',
+      onConfirm: () => {
+        void batch.deleteSelected(list);
+      },
+    });
+  };
+
+  const handleBatchDownload = () => {
+    const list = selectedEntries;
+    if (list.length === 0) return;
+    const files = list.filter((entry) => !entry.isCollection);
+    if (files.length > 1) {
+      setConfirm({
+        title: `批量下载 ${files.length} 个文件`,
+        description: `将依次触发 ${files.length} 次浏览器下载。Chrome 等浏览器默认会拦截「自动下载多个文件」，出现提示时请在地址栏选择「允许」；也可改用「打包 ZIP」一次下载。`,
+        confirmLabel: '开始下载',
+        tone: 'default',
+        onConfirm: () => {
+          void batch.downloadSelected(list);
+        },
+      });
+    } else {
+      void batch.downloadSelected(list);
+    }
+  };
+
+  const handleBatchMoveConfirm = (targetPath: string) => {
+    setMoveOpen(false);
+    const list = selectedEntries;
+    if (list.length > 0) void batch.moveSelected(list, targetPath);
+  };
 
   /* ------------------------------ 文件操作 ------------------------------ */
 
@@ -333,18 +444,6 @@ export function Browser({
   };
 
   /* ------------------------------ 上传 ------------------------------ */
-
-  const askConflict = (name: string): Promise<ConflictChoice> =>
-    new Promise((resolve) => {
-      setConflict({
-        name,
-        resolve: (choice, applyToAll) => {
-          if (applyToAll) applyAllChoice.current = choice;
-          setConflict(null);
-          resolve(choice);
-        },
-      });
-    });
 
   const updateTask = (id: string, patch: Partial<UploadTask>) =>
     setTasks((prev) => prev.map((task) => (task.id === id ? { ...task, ...patch } : task)));
@@ -687,6 +786,21 @@ export function Browser({
             </div>
           </div>
 
+          <BatchBar
+            count={selectedEntries.length}
+            fileCount={selectedFileCount}
+            folderCount={selectedFolderCount}
+            totalBytes={selectedBytes}
+            allCount={sorted.length}
+            busy={batch.busy}
+            onSelectAll={() => selectAll(sorted.map((entry) => entry.path))}
+            onClear={clear}
+            onDownload={handleBatchDownload}
+            onZip={() => void batch.zipSelected(selectedEntries)}
+            onMove={() => setMoveOpen(true)}
+            onDelete={handleBatchDelete}
+          />
+
           {/* 文件区 */}
           <div
             className="drop-area"
@@ -765,12 +879,20 @@ export function Browser({
                 />
               ) : (
                 <>
-                  <FileTable entries={pageItems} viewMode={viewMode} {...fileActions} />
+                  <FileTable
+                    entries={pageItems}
+                    viewMode={viewMode}
+                    selected={selected}
+                    onSelect={(target, mods) => select(target, mods, pagePaths)}
+                    onTogglePage={(checked) => togglePage(pagePaths, checked)}
+                    {...fileActions}
+                  />
                   <div className="pagination">
                     <span>
                       第 {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, sorted.length)} 项，
                       共 {sorted.length} 项{totalPages > 1 ? ` · ${totalPages} 页` : ''}
                       {sorted.length > CONFIG.PAGE_SIZE ? ' · 已启用分页保护大目录' : ''}
+                      {' · 按住 Ctrl / Shift 可多选'}
                     </span>
                     <div className="pagination__controls">
                       <select
@@ -848,30 +970,51 @@ export function Browser({
         }}
       />
 
-      {/* 浮层 */}
-      {transferOpen && (
-        <TransferPanel
-          tasks={tasks}
-          download={download}
-          onClose={() => setTransferOpen(false)}
-          onClearFinished={clearFinishedTasks}
-          onCancel={cancelTask}
-        />
-      )}
-      {tasks.length > 0 && !transferOpen && (
-        <button
-          type="button"
-          className="btn btn--primary"
-          style={{ position: 'fixed', right: 22, bottom: 22, zIndex: 90 }}
-          onClick={() => setTransferOpen(true)}
-        >
-          <Upload size={15} /> 传输任务 ({tasks.length})
-        </button>
-      )}
+      {/* 浮层：批量任务与传输任务共用右下角堆叠容器 */}
+      <div className="floating-stack">
+        {batch.panelOpen && batch.job && (
+          <BatchPanel
+            job={batch.job}
+            onCancel={batch.cancel}
+            onClose={batch.close}
+            onCollapse={() => batch.setPanelOpen(false)}
+          />
+        )}
+        {transferOpen && (
+          <TransferPanel
+            tasks={tasks}
+            download={download}
+            onClose={() => setTransferOpen(false)}
+            onClearFinished={clearFinishedTasks}
+            onCancel={cancelTask}
+          />
+        )}
+        {batch.job && !batch.panelOpen && (
+          <button type="button" className="btn btn--primary floating-chip" onClick={() => batch.setPanelOpen(true)}>
+            <Layers size={15} /> {batch.job.title}
+            {batch.job.finished ? '' : ' · 进行中'}
+          </button>
+        )}
+        {tasks.length > 0 && !transferOpen && (
+          <button type="button" className="btn btn--primary floating-chip" onClick={() => setTransferOpen(true)}>
+            <Upload size={15} /> 传输任务 ({tasks.length})
+          </button>
+        )}
+      </div>
 
       <ConfirmDialog state={confirm} onClose={() => setConfirm(null)} />
       <InputDialog state={inputDialog} onClose={() => setInputDialog(null)} />
       <OverwriteDialog state={conflict} />
+      <MoveDialog
+        open={moveOpen}
+        client={client}
+        initialPath={path}
+        sourcePath={path}
+        blockedPaths={selectedEntries.filter((entry) => entry.isCollection).map((entry) => entry.path)}
+        count={selectedEntries.length}
+        onClose={() => setMoveOpen(false)}
+        onConfirm={handleBatchMoveConfirm}
+      />
       <Toasts items={toasts} onDismiss={(id) => setToasts((prev) => prev.filter((item) => item.id !== id))} />
 
       {previewEntry && (
