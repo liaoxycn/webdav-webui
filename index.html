@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%234f46e5'/%3E%3Cpath d='M18 38h7l4-9h11l4 9h3a5 5 0 0 1 5 5v3a5 5 0 0 1-5 5H18a5 5 0 0 1-5-5v-3a5 5 0 0 1 5-5Z' fill='none' stroke='white' stroke-width='3.5' stroke-linejoin='round'/%3E%3C/svg%3E"
+    />
+    <meta
+      name="description"
+      content="纯前端 WebDAV 文件管理器 — 凭据仅保存在本地浏览器，不经过任何第三方服务。"
+    />
+    <title>WebDAV Studio · 文件管理</title>
+    <script>
+      // 产物以相对路径引用 ./assets/...，因此页面必须以「目录 URL」（带尾斜杠）访问。
+      // 兼容 /webui、/webui/index.html 这类入口，统一规范化为 /webui/，
+      // 否则 /webui 会把 ./assets/x.js 解析成站点根的 /assets/x.js（404）。
+      (function () {
+        if (window.location.protocol === 'file:') return;
+        var path = window.location.pathname;
+        if (path.charAt(path.length - 1) === '/') return;
+        var last = path.split('/').pop() || '';
+        var target = /\.(html?|htm)$/i.test(last)
+          ? path.slice(0, path.length - last.length)
+          : path + '/';
+        window.location.replace(target + window.location.search + window.location.hash);
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./src/main.tsx"></script>
+  </body>
+</html>

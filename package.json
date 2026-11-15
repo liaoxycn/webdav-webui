@@ -1,0 +1,32 @@
+{
+  "name": "webdav-webui",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "纯前端 WebDAV 文件管理器（Vite + React + TypeScript）",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "typecheck": "tsc -b --pretty false",
+    "preview": "vite preview",
+    "serve:prefix": "node tools/serve-prefix.mjs",
+    "mock:dav": "node tools/mock-webdav.mjs",
+    "mock:dav:no-cors": "node tools/mock-webdav.mjs --no-cors --port=8789",
+    "mock:dav:digest": "node tools/mock-webdav.mjs --digest --port=8788"
+  },
+  "dependencies": {
+    "dompurify": "^3.2.4",
+    "lucide-react": "^0.468.0",
+    "markdown-it": "^14.1.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/markdown-it": "^14.1.2",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.7.3",
+    "vite": "^6.0.7"
+  }
+}

@@ -1,0 +1,89 @@
+# WebDAV Studio — Nginx 子路径 / 前缀代理部署示例
+#
+# 前提：应用构建产物（dist/ 里的全部文件）已就位。
+# 构建：npm run build        （默认相对资源，任意前缀通用）
+#      或在 .env 里写 VITE_BASE=/webui/ 后再构建（固定绝对前缀）
+#
+# 关键点：
+#   1) 必须以 /webui/ 访问（尾斜杠）。相对资源 ./assets/x.js 只有在目录 URL
+#      下才会解析成 /webui/assets/x.js；/webui 会解析成 /assets/x.js → 404。
+#      应用 index.html 内置了一段规范化脚本会自动补斜杠，这里仍建议显式 301。
+#   2) ^~ 保证该前缀优先于其它正则 location。
+#   3) 前端无路由，但保留 try_files 回退可兼容刷新 / 直接打开任意子路径。
+#
+# 三选一，把对应的 location 块放进 server {} 中。
+
+# ---------------------------------------------------------------------------
+# 方案 A（推荐，最简单）：静态文件放在 nginx 的 html/webui/ 目录
+#   /usr/share/nginx/html/webui/index.html
+#   /usr/share/nginx/html/webui/assets/...
+#   用 root 而不是 alias，可避开 alias + try_files 的已知路径拼接问题。
+# ---------------------------------------------------------------------------
+location = /webui {
+    return 301 /webui/;
+}
+
+location ^~ /webui/ {
+    root /usr/share/nginx/html;                # /webui/assets/x.js → html/webui/assets/x.js
+    index index.html;
+    try_files $uri $uri/ /webui/index.html;
+
+    location ~* \.(?:js|css|svg|png|jpg|ico|woff2?)$ {
+        expires 7d;
+        add_header Cache-Control "public, immutable";
+        try_files $uri =404;
+    }
+}
+
+# ---------------------------------------------------------------------------
+# 方案 B：反向代理到「在根路径提供同一份 dist」的上游
+#   proxy_pass 结尾的 / 表示把 /webui/ 前缀剥离后再转发，
+#   即 /webui/assets/x.js → http://127.0.0.1:8080/assets/x.js
+# ---------------------------------------------------------------------------
+# location = /webui {
+#     return 301 /webui/;
+# }
+#
+# location ^~ /webui/ {
+#     proxy_pass http://127.0.0.1:8080/;       # 结尾斜杠 = 去掉前缀
+#     proxy_http_version 1.1;
+#     proxy_set_header Host              $host;
+#     proxy_set_header X-Real-IP         $remote_addr;
+#     proxy_set_header X-Forwarded-For  $proxy_add_x_forwarded_for;
+#     proxy_set_header X-Forwarded-Proto $scheme;
+#     proxy_set_header X-Forwarded-Prefix /webui;
+# }
+
+# ---------------------------------------------------------------------------
+# 方案 C：上游自身也部署在 /webui/ 前缀（保留前缀透传）
+#   proxy_pass 不带结尾斜杠，Nginx 不改写原始 URI
+# ---------------------------------------------------------------------------
+# location = /webui {
+#     return 301 /webui/;
+# }
+#
+# location ^~ /webui/ {
+#     proxy_pass http://127.0.0.1:8080;        # 无结尾斜杠 = 原样透传 /webui/...
+#     proxy_http_version 1.1;
+#     proxy_set_header Host              $host;
+#     proxy_set_header X-Forwarded-Proto $scheme;
+#     proxy_set_header X-Forwarded-Prefix /webui;
+# }
+
+# ---------------------------------------------------------------------------
+# 若上游是 Vite dev server（仅开发调试用），需额外放行 HMR WebSocket：
+#   proxy_set_header Upgrade    $http_upgrade;
+#   proxy_set_header Connection "upgrade";
+#
+# ---------------------------------------------------------------------------
+# 排查清单
+#   · 浏览器 F12 → Network：/webui/assets/*.js 必须 200，且 Content-Type 是
+#     application/javascript；若返回 text/html 说明命中了 try_files 回退，
+#     检查 root/alias 拼接或上游是否真的有该文件。
+#   · 出现 /assets/*.js（少了 /webui）→ base 仍是旧的 '/' 产物，重新 npm run build。
+#   · 出现 403 → nginx 对目录无读权限，检查文件权限与 SELinux。
+#   · 页面空白但资源 200 → 看 Console；通常是 HTTPS 页面连了 HTTP WebDAV
+#     （混合内容），这与部署前缀无关，属于 WebDAV 连接配置问题。
+#
+# 注意：部署前缀只决定「应用自身静态资源」的位置。连接表单里的 WebDAV 根 URL
+# 仍需填写服务端实际地址（如果 WebDAV 也在同一 nginx 后面，就填它的完整前缀）。
