@@ -46,10 +46,10 @@ Nginx 子路径 / 前缀代理配置模板见 [deploy/nginx-subpath.conf.example
 仓库已配置 [.github/workflows/deploy.yml](.github/workflows/deploy.yml)，推送到 `master` 后自动构建并发布，访问地址：
 
 ```
-https://<用户名>.github.io/<仓库名>/
+https://liaoxycn.github.io/webdav-webui/
 ```
 
-首次部署前，在仓库 **Settings → Pages → Build and deployment** 把 Source 选为 **GitHub Actions**（工作流也会尝试自动启用）。Vite 的 `base` 由工作流按仓库名推导，因此 fork 或改名后无需改代码。
+**首次部署需要先启用 Pages（只需一次）**：打开 [Settings → Pages](https://github.com/liaoxycn/webdav-webui/settings/pages)，把 **Build and deployment → Source** 选为 **GitHub Actions**。未启用时工作流会停在 `Setup Pages` 步骤失败，启用后在 Actions 页面点 **Re-run** 即可。Vite 的 `base` 由工作流按仓库名推导，因此 fork 或改名后无需改代码。
 
 > Pages 强制 HTTPS，所以只能连接 **HTTPS** 的 WebDAV 服务端；`http://` 的地址会被浏览器的混合内容策略拦截。
 
