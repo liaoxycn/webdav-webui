@@ -26,7 +26,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           # 仓库不提交 package-lock.json，因此无法使用 setup-node 的 npm 缓存
 
       # Pages 项目站点挂在 /<仓库名>/ 下，据此推导 Vite 的 base。
